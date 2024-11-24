@@ -1,0 +1,54 @@
+substitutions:
+  name: temperature-probe-DEVICEID # Replace with esp device id, should have been configured during initial device setup
+  friendly_name: Temperature-Probe DEVICEID # Replace with esp device id, should have been configured during initial device setup
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2024.6.0
+  name_add_mac_suffix: false
+  project:
+    name: esphome.web
+    version: dev
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+improv_serial:
+
+wifi:
+  ap: {}
+
+captive_portal:
+
+dashboard_import:
+  package_import_url: github://esphome/example-configs/esphome-web/esp32.yaml@main
+  import_full_config: true
+
+esp32_improv:
+  authorizer: none
+
+web_server:
+
+# Enables OneWire on gpio pin
+one_wire:
+  - platform: gpio
+    pin: GPIO4 # Modify based on utilized gpio pin for the OneWire connection
+# Defines dallas_temp sensor to be shown in HomeAssistant
+sensor:
+  - platform: dallas_temp
+    address: 0x0ec47a730a646128 # Modify based on sensor address
+    name: Temperature
+    update_interval: 120s
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"

@@ -1,0 +1,177 @@
+substitutions:
+  name: gas-meter-DEVICEID # Replace with esp device id, should have been configured during initial device setup
+  friendly_name: Gas-Meter DEVICEID # Replace with esp device id, should have been configured during initial device setup
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2024.6.0
+  name_add_mac_suffix: false
+  project:
+    name: esphome.web
+    version: dev
+  on_boot:
+    then:
+      - logger.log:
+          format: "ESP32 Startup: \n- Total pulse count %d\n- Total volume %f"
+          args: [ 'id(total_pulse_count)', 'id(total_volume_amount)']
+      - sensor.template.publish:
+          id: total_pulse_count_sensor
+          state: !lambda return id(total_pulse_count);
+      - sensor.template.publish:
+          id: total_volume_amount_sensor
+          state: !lambda return id(total_volume_amount);
+      - sensor.template.publish:
+          id: volume_amount_per_pulse_sensor
+          state: !lambda return id(volume_amount_per_pulse);
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+improv_serial:
+
+wifi:
+  ap: {}
+
+captive_portal:
+
+dashboard_import:
+  package_import_url: github://esphome/example-configs/esphome-web/esp32.yaml@main
+  import_full_config: true
+
+esp32_improv:
+  authorizer: none
+
+web_server:
+
+globals:
+  - id: total_pulse_count
+    type: int
+    restore_value: true
+    initial_value: '0'
+  - id: total_volume_amount
+    type: float
+    restore_value: true
+    initial_value: '0.0'
+  - id: volume_amount_per_pulse
+    type: float
+    restore_value: true
+    initial_value: '0.01'
+
+binary_sensor:
+  - platform: gpio
+    name: Current Readout State
+    pin:
+      number: 23 # Modify based on utilized gpio pin for the reed/field sensor input
+      mode:
+        input: true
+        pullup: true # Modify based on sensor behaviour
+    filters:
+      settle: 100ms
+    on_press:
+      then:
+        - globals.set:
+            id: total_pulse_count
+            value: !lambda return id(total_pulse_count) + 1;
+        - globals.set:
+            id: total_volume_amount
+            value: !lambda return id(total_volume_amount) + id(volume_amount_per_pulse);
+        - sensor.template.publish:
+            id: total_pulse_count_sensor
+            state: !lambda return id(total_pulse_count);
+        - sensor.template.publish:
+            id: total_volume_amount_sensor
+            state: !lambda return id(total_volume_amount);
+        - logger.log:
+            format: "Pulse received %d: %f"
+            args: [ 'id(total_pulse_count)', 'id(total_volume_amount)']
+
+# Define sensors to be shown in HomeAssistant
+sensor:
+  - platform: template
+    id: total_pulse_count_sensor
+    name: Total Pulse Count
+    state_class: total_increasing
+    accuracy_decimals: 0
+    lambda: return id(total_pulse_count);
+    update_interval: never
+  - platform: template
+    id: total_volume_amount_sensor
+    name: Total Volume Amount
+    device_class: gas
+    unit_of_measurement: 'm³'
+    state_class: total_increasing
+    accuracy_decimals: 3
+    lambda: return id(total_volume_amount);
+    update_interval: never
+  - platform: template
+    id: volume_amount_per_pulse_sensor
+    name: Volume Amount Per Pulse
+    device_class: gas
+    unit_of_measurement: 'm³'
+    state_class: total_increasing
+    accuracy_decimals: 3
+    lambda: return id(volume_amount_per_pulse);
+    update_interval: never
+
+# Defines configuration overrides to be shown in HomeAssistant (disabled by default)
+number:
+  - platform: template
+    name: Total Pulse Count Override
+    disabled_by_default: true
+    min_value: 0
+    max_value: 2147483647
+    step: 1
+    set_action:
+      then:
+        - globals.set:
+            id: total_pulse_count
+            value: !lambda return x;
+        - sensor.template.publish:
+            id: total_pulse_count_sensor
+            state: !lambda return x;
+  - platform: template
+    name: Total Volume Amount Override
+    disabled_by_default: true
+    min_value: 0
+    max_value: 2147483647
+    step: 0.001
+    set_action:
+      then:
+        - globals.set:
+            id: total_volume_amount
+            value: !lambda return x;
+        - sensor.template.publish:
+            id: total_volume_amount_sensor
+            state: !lambda return x;
+  - platform: template
+    name: Volume Amount Per Pulse Override
+    disabled_by_default: true
+    min_value: 0
+    max_value: 2147483647
+    step: 0.001
+    set_action:
+      then:
+        - globals.set:
+            id: volume_amount_per_pulse
+            value: !lambda return x;
+        - sensor.template.publish:
+            id: volume_amount_per_pulse_sensor
+            state: !lambda return x;
+
+# Defines soft restart and factory reset functionality (disabled by default)
+button:
+  - platform: restart
+    name: Restart
+  - platform: factory_reset
+    name: Reset to Factory Default Settings
+    disabled_by_default: true
